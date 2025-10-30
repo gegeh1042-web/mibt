@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>备份测试</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <h1>备份测试页面</h1>
+    <div id="status">检测中...</div>
+    
+    <script>
+        // 测试CSS加载
+        const styleStatus = document.styleSheets.length > 0 ? '✅ CSS加载成功' : ' CSS加载失败';
+        
+        // 测试JS执行
+        const jsStatus = '✅ JavaScript执行正常';
+        
+        // 更新状态
+        document.getElementById('status').innerHTML = `
+            <div>${styleStatus}</div>
+            <div>${jsStatus}</div>
+            <div>✅ 页面渲染正常</div>
+        `;
+        
+        console.log('备份测试完成');
+    </script>
+</body>
+</html>
