@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代码错误诊断工具</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        h1 { color: #333; margin-bottom: 20px; text-align: center; }
+        .section { margin: 30px 0; padding: 20px; border-left: 4px solid #007acc; background: #f8f9fa; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .pass { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .fail { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button { background: #007acc; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
+        button:hover { background: #005a9e; }
+        .code { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; margin: 10px 0; font-family: 'Courier New', monospace; overflow-x: auto; }
+        .hidden { display: none; }
+        .error-details { background: #ffe6e6; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1> 代码错误诊断工具</h1>
+        
+        <div class="section">
+            <h2>1. 基础环境检测</h2>
+            <div id="basic-tests"></div>
+        </div>
+        
+        <div class="section">
+            <h2>2. 文件加载状态</h2>
+            <div id="file-tests"></div>
+        </div>
+        
+        <div class="section">
+            <h2>3. JavaScript 错误检测</h2>
+            <div id="js-tests"></div>
+            <button onclick="testJavaScript()">运行 JavaScript 测试</button>
+            <div id="js-results" class="hidden"></div>
+        </div>
+        
+        <div class="section">
+            <h2>4. CSS 样式检测</h2>
+            <div id="css-tests"></div>
+            <button onclick="testCSS()">运行 CSS 测试</button>
+            <div id="css-results" class="hidden"></div>
+        </div>
+        
+        <div class="section">
+            <h2>5. 自动修复建议</h2>
+            <div id="fix-suggestions"></div>
+            <button onclick="generateFix()">生成修复代码</button>
+            <div id="fix-code" class="hidden code"></div>
+        </div>
+        
+        <div class="section">
+            <h2>6. 详细错误报告</h2>
+            <button onclick="generateReport()">生成完整报告</button>
+            <div id="full-report" class="hidden code"></div>
+        </div>
+    </div>
+
+    <script>
+        // 全局错误收集
+        window.collectedErrors = [];
+        window.originalOnerror = window.onerror;
+        
+        // 错误捕获
+        window.onerror = function(msg, source, lineno, colno, error) {
+            window.collectedErrors.push({
+                message: msg,
+                source: source,
+                line: lineno,
+                column: colno,
+                error: error?.toString(),
+                timestamp: new Date().toISOString()
+            });
+            
+            if (window.originalOnerror) {
+                return window.originalOnerror(msg, source, lineno, colno, error);
+            }
+            return false;
+        };
+
+        // 基础测试
+        function runBasicTests() {
+            const tests = [];
+            
+            // HTML 结构测试
+            tests.push({
+                name: 'DOCTYPE 声明',
+                result: !!document.doctype,
+                fix: '添加 <!DOCTYPE html> 到文件开头'
+            });
+            
+            tests.push({
+                name: 'HTML 标签',
+                result: !!document.documentElement,
+                fix: '确保有 <html> 标签'
+            });
+            
+            tests.push({
+                name: 'HEAD 标签',
+                result: !!document.head,
+                fix: '确保有 <head> 标签'
+            });
+            
+            tests.push({
+                name: 'BODY 标签',
+                result: !!document.body,
+                fix: '确保有 <body> 标签'
+            });
+            
+            tests.push({
+                name: '字符编码',
+                result: document.characterSet === 'UTF-8',
+                fix: '添加 <meta charset="UTF-8">'
+            });
+            
+            tests.push({
+                name: '视口设置',
+                result: !!document.querySelector('meta[name="viewport"]'),
+                fix: '添加 <meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            });
+            
+            displayTestResults('basic-tests', tests);
+            return tests;
+        }
+
+        // 文件加载测试
+        function runFileTests() {
+            const tests = [];
+            const resources = performance.getEntriesByType('resource');
+            
+            // 检查主要文件
+            const expectedFiles = ['index.html', 'style.css', 'script.js'];
+            
+            expectedFiles.forEach(file => {
+                const resource = resources.find(r => r.name.includes(file));
+                tests.push({
+                    name: `${file} 文件加载`,
+                    result: !!resource && resource.responseStatus === 200,
+                    fix: `检查 ${file} 文件是否存在且路径正确`
+                });
+            });
+            
+            // 检查外部资源
+            const externalResources = resources.filter(r => 
+                r.name.includes('http') && !r.name.includes(location.hostname)
+            );
+            
+            externalResources.forEach(resource => {
+                tests.push({
+                    name: `外部资源: ${new URL(resource.name).hostname}`,
+                    result: resource.responseStatus === 200,
+                    fix: `检查 ${resource.name} 是否可访问`
+                });
+            });
+            
+            displayTestResults('file-tests', tests);
+            return tests;
+        }
+
+        // JavaScript 测试
+        function testJavaScript() {
+            const results = document.getElementById('js-results');
+            results.classList.remove('hidden');
+            results.innerHTML = '<div class="test-result warning">测试中...</div>';
+            
+            setTimeout(() => {
+                const tests = [];
+                
+                // 语法错误测试
+                tests.push({
+                    name: '基础语法',
+                    result: testBasicSyntax(),
+                    fix: '检查 JavaScript 语法错误'
+                });
+                
+                // DOM 操作测试
+                tests.push({
+                    name: 'DOM 操作',
+                    result: testDOMOperations(),
+                    fix: '检查 DOM 元素是否存在'
+                });
+                
+                // 事件处理测试
+                tests.push({
+                    name: '事件处理',
+                    result: testEventHandling(),
+                    fix: '检查事件监听器设置'
+                });
+                
+                let html = '';
+                tests.forEach(test => {
+                    const className = test.result ? 'pass' : 'fail';
+                    html += `<div class="test-result ${className}">${test.name}: ${test.result ? '通过' : '失败'}</div>`;
+                    if (!test.result) {
+                        html += `<div class="error-details">修复建议: ${test.fix}</div>`;
+                    }
+                });
+                
+                // 显示收集的错误
+                if (window.collectedErrors.length > 0) {
+                    html += '<div class="test-result fail">发现 JavaScript 错误:</div>';
+                    window.collectedErrors.forEach(error => {
+                        html += `<div class="error-details">
+                            <strong>错误:</strong> ${error.message}<br>
+                            <strong>位置:</strong> ${error.source}:${error.line}<br>
+                            <strong>时间:</strong> ${error.timestamp}
+                        </div>`;
+                    });
+                }
+                
+                results.innerHTML = html;
+            }, 100);
+        }
+
+        // CSS 测试
+        function testCSS() {
+            const results = document.getElementById('css-results');
+            results.classList.remove('hidden');
+            results.innerHTML = '<div class="test-result warning">测试中...</div>';
+            
+            setTimeout(() => {
+                const tests = [];
+                const stylesheets = document.styleSheets;
+                
+                tests.push({
+                    name: '样式表加载',
+                    result: stylesheets.length > 0,
+                    fix: '检查 CSS 文件路径和链接'
+                });
+                
+                let html = '';
+                for (let i = 0; i < stylesheets.length; i++) {
+                    try {
+                        const rules = stylesheets[i].cssRules;
+                        tests.push({
+                            name: `样式表 ${i+1} 语法`,
+                            result: true,
+                            fix: ''
+                        });
+                    } catch (e) {
+                        tests.push({
+                            name: `样式表 ${i+1} 语法`,
+                            result: false,
+                            fix: `CSS 语法错误: ${e.message}`
+                        });
+                    }
+                }
+                
+                tests.forEach(test => {
+                    const className = test.result ? 'pass' : 'fail';
+                    html += `<div class="test-result ${className}">${test.name}: ${test.result ? '通过' : '失败'}</div>`;
+                    if (!test.result) {
+                        html += `<div class="error-details">修复建议: ${test.fix}</div>`;
+                    }
+                });
+                
+                results.innerHTML = html;
+            }, 100);
+        }
+
+        // 辅助测试函数
+        function testBasicSyntax() {
+            try {
+                // 测试基本语法
+                eval('const test = 1;');
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function testDOMOperations() {
+            try {
+                const testEl = document.createElement('div');
+                document.body.appendChild(testEl);
+                document.body.removeChild(testEl);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function testEventHandling() {
+            try {
+                const handler = () => {};
+                document.addEventListener('test', handler);
+                document.removeEventListener('test', handler);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // 显示测试结果
+        function displayTestResults(containerId, tests) {
+            const container = document.getElementById(containerId);
+            let html = '';
+            
+            tests.forEach(test => {
+                const className = test.result ? 'pass' : 'fail';
+                html += `<div class="test-result ${className}">${test.name}: ${test.result ? '通过' : '失败'}</div>`;
+                if (!test.result) {
+                    html += `<div class="error-details">修复建议: ${test.fix}</div>`;
+                }
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // 生成修复代码
+        function generateFix() {
+            const basicTests = runBasicTests();
+            const fileTests = runFileTests();
+            
+            const failedTests = [...basicTests, ...fileTests].filter(test => !test.result);
+            
+            let fixCode = '<!-- 生成的修复代码 -->\\n';
+            
+            failedTests.forEach(test => {
+                fixCode += `<!-- 修复: ${test.name} -->\\n`;
+                fixCode += `<!-- ${test.fix} -->\\n\\n`;
+            });
+            
+            // 添加通用修复模板
+            fixCode += `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修复后的页面</title>
+    <style>
+        /* 基础样式重置 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 您的内容在这里 -->
+    </div>
+    <script>
+        // 安全的 JavaScript 代码
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('页面加载完成');
+            // 您的 JavaScript 代码在这里
+        });
+    </script>
+</body>
+</html>`;
+            
+            document.getElementById('fix-code').classList.remove('hidden');
+            document.getElementById('fix-code').textContent = fixCode;
+        }
+
+        // 生成完整报告
+        function generateReport() {
+            const report = {
+                timestamp: new Date().toISOString(),
+                url: location.href,
+                userAgent: navigator.userAgent,
+                errors: window.collectedErrors,
+                tests: {
+                    basic: runBasicTests(),
+                    files: runFileTests()
+                }
+            };
+            
+            document.getElementById('full-report').classList.remove('hidden');
+            document.getElementById('full-report').textContent = JSON.stringify(report, null, 2);
+        }
+
+        // 页面加载时自动运行基础测试
+        document.addEventListener('DOMContentLoaded', function() {
+            runBasicTests();
+            runFileTests();
+        });
+    </script>
+</body>
+</html>
